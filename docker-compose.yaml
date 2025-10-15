@@ -1,0 +1,138 @@
+---
+services:
+  ####################
+  # Backend  service #
+  ####################
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: server
+    depends_on:
+      - mongodb
+    expose:
+      - "8001"
+    networks:
+      - url-shortener
+    restart: unless-stopped
+
+  ##################
+  # Client service #
+  ##################
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: client
+    depends_on:
+      - mongodb
+    expose:
+      - "5000"
+    networks:
+      - url-shortener
+    restart: unless-stopped
+
+  # ####################
+  # # DataBase service #
+  # ####################
+  # mongodb:
+  #   hostname: mongodb
+  #   image: mongodb/mongodb-atlas-local:8.0.7
+  #   environment:
+  #     - MONGODB_INITDB_ROOT_USERNAME=${{ secrets.DB_USERNAME }}
+  #     - MONGODB_INITDB_ROOT_PASSWORD=${{ secrets.DB_PASSWORD }}
+  #   expose:
+  #     - "27017"
+  #   volumes:
+  #     - data:/data/db
+  #     - config:/data/configdb
+  #   networks:
+  #     - url-shortener
+  #   restart: unless-stopped
+
+  #################
+  # Nginx service #
+  #################
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: nginx
+    depends_on:
+      - client
+    networks:
+      - url-shortener
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+
+  ######################
+  # Prometheus service #
+  ######################
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - '--web.external-url=/prometheus/'
+      - '--web.route-prefix=/prometheus/'
+    expose:
+      - "9090"
+    networks:
+      - url-shortener
+    restart: unless-stopped
+
+  ######################
+  #  Grafana service   #
+  ######################
+  grafana:
+    image: grafana/grafana:main
+    container_name: grafana
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+    expose:
+      - "3000"
+    networks:
+      - url-shortener
+    restart: unless-stopped
+
+##########################
+##    Node Exporter     ##
+##########################
+
+  node-exporter:
+    image: prom/node-exporter:v1.5.0
+    container_name: node-exporter
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro
+    expose:
+      - "9100"
+    networks:
+      - url-shortener
+    restart: unless-stopped
+
+##########################
+## Volumes and Networks ##
+##########################
+
+volumes:
+  data:
+  config:
+  prometheus-data:
+  grafana-storage:
+
+networks:
+  url-shortener:
+    driver: bridge
