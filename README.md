@@ -1,4 +1,4 @@
-# URL Shortener
+# URL Shortener App
 
 This repository implements a simple URL shortener with observability (Prometheus + Grafana) and an Nginx reverse-proxy. It contains:
 
